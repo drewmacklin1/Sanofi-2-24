@@ -8,6 +8,7 @@ library(ggprism)
 targets <- as.data.frame(as.matrix(read.csv('results_target_credentialing/genelist_targets.csv'), row.names = 1))
 program_list <- unique(targets$program)[1:7] #ignore PMP
 studylist<-c(list.files("datasets")[1:10], list.files("datasets")[13:16]) #ignore the overlap folders
+studylist<-studylist[c(3,4,5,7,8,10,11,12,13,14)]
 
 for(s in 1:length(studylist)){
   study <- studylist[s]
@@ -19,9 +20,9 @@ for(s in 1:length(studylist)){
   }
 
   #for every cell type in pseudobulk folder (excluding the all_cells)
-  odds <- function(x) x[ x %% 2 == 1 ]
-  modifier <- odds(1:length(files))
-  for (j in modifier){
+  #odds <- function(x) x[ x %% 2 == 1 ]
+  #modifier <- odds(1:length(files))
+  for (j in c(1)){#} modifier){
     data_counts<-as.data.frame(read.csv(paste0('datasets/', study, '/pseudobulk_counts_matrices/', files[j])))
     rownames(data_counts)<-data_counts$X
     data_counts<-data_counts[-1]

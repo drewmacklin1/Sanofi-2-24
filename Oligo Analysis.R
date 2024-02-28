@@ -404,12 +404,12 @@ Idents(seurat.obj)<-seurat.obj@meta.data$keep
 seurat.obj<-subset(seurat.obj, idents = TRUE)
 seurat.obj@meta.data$cell_subtype<- seurat.obj@meta.data$Author.s.cell.subtype..Oligodendrocyte.
 seurat.obj@meta.data$cell_subtype[seurat.obj@meta.data$cell_subtype == "Unassigned"]<- seurat.obj@meta.data$Author.s.cell.type[seurat.obj@meta.data$cell_subtype == "Unassigned"]
-seurat.obj <- FindVariableFeatures(object = seurat.obj)
-seurat.obj <- ScaleData(object = seurat.obj)
-seurat.obj <- RunPCA(object = seurat.obj)
-seurat.obj <- RunUMAP(object = seurat.obj, dims = 1:5)
-DimPlot(seurat.obj, reduction = 'umap', group.by = "cell_subtype", raster = FALSE)
-VlnPlot(seurat.obj,  c("SOX6", "OLIG2","PDGFRA","CNP", "ASPA", "MAG", "PLP1","MOG","HSP90AA1", "LINGO1", "KLK6","OPALIN"), cols = NULL, pt.size = 0, idents = NULL, sort = FALSE, assay = NULL, group.by = "cell_subtype", split.by = NULL, adjust = 1, y.max = NULL, same.y.lims = FALSE, log = FALSE, ncol = NULL, split.plot = FALSE, stack = TRUE, combine = TRUE, fill.by = "feature", flip = FALSE, add.noise = TRUE, raster = NULL)
+#seurat.obj <- FindVariableFeatures(object = seurat.obj)
+#seurat.obj <- ScaleData(object = seurat.obj)
+#seurat.obj <- RunPCA(object = seurat.obj)
+#seurat.obj <- RunUMAP(object = seurat.obj, dims = 1:5)
+#DimPlot(seurat.obj, reduction = 'umap', group.by = "cell_subtype", raster = FALSE)
+#VlnPlot(seurat.obj,  c("SOX6", "OLIG2","PDGFRA","CNP", "ASPA", "MAG", "PLP1","MOG","HSP90AA1", "LINGO1", "KLK6","OPALIN"), cols = NULL, pt.size = 0, idents = NULL, sort = FALSE, assay = NULL, group.by = "cell_subtype", split.by = NULL, adjust = 1, y.max = NULL, same.y.lims = FALSE, log = FALSE, ncol = NULL, split.plot = FALSE, stack = TRUE, combine = TRUE, fill.by = "feature", flip = FALSE, add.noise = TRUE, raster = NULL)
 
 seurat.obj@meta.data$cell_type<-seurat.obj@meta.data$cell_subtype
 seurat.obj@meta.data$keep<-FALSE
@@ -419,6 +419,8 @@ seurat.obj<-subset(seurat.obj, idents = TRUE)
 seurat.obj@meta.data$sample_id<-seurat.obj@meta.data$Sample.ID
 seurat.obj@meta.data$condition<-seurat.obj@meta.data$cell_subtype
 seurat.obj@meta.data$gender<-seurat.obj@meta.data$Gender
+seurat.obj$patient_info<-paste(seurat.obj@meta.data$Age..years., seurat.obj@meta.data$gender..standardized., seurat.obj@meta.data$Clinical.notes)
+
 metadata2 <- as.data.frame(seurat.obj@meta.data)
 sample_ids <- unique(metadata2$sample_id)
 output_counts <- data.frame()
@@ -448,35 +450,267 @@ data_counts<-output_counts
 data_counts <- round(data_counts)
 metadata<-output_metadata
 metadata$sample <- rownames(metadata)
-dds <- DESeqDataSetFromMatrix(countData = data_counts, colData = metadata, design = ~ condition + gender)
+dds <- DESeqDataSetFromMatrix(countData = data_counts, colData = metadata, design = ~ condition + patient_info)
 dds <- estimateSizeFactors(dds)
 keep <- rowSums(dds@colData$condition == 'normal oligodendrocyte' & counts(dds, normalized=TRUE)==0) <= .25*sum(dds@colData$condition == 'normal oligodendrocyte') & rowSums(dds@colData$condition != 'normal oligodendrocyte' & counts(dds, normalized=TRUE)==0) <=.25*sum(dds@colData$condition != 'normal oligodendrocyte')
 dds <- dds[keep,]
 dds <- DESeq(dds)
-result <- results(dds, contrast = c('condition', 'normal oligodendrocyte', 'stressed oligodendrocyte'))
+result <- results(dds, contrast = c('condition', 'stressed oligodendrocyte', 'normal oligodendrocyte'))
 final_results <- data.frame(result)
 final_results$gene_name <- rownames(final_results)
 final_results$comparison <- "Stressed vs normal"
-significant <- subset(filter(final_results, abs(log2FoldChange)>.585))
-significant <- subset(filter(significant, pvalue<.05))
-significant <- subset(filter(significant, baseMean>50))
-write.csv(significant, paste0("OligoAnalysis/differential_expression_results/diffex_results_(stressed.vs.normal oligos gse180759_sig).csv"))
+#significant <- subset(filter(final_results, abs(log2FoldChange)>.585))
+#significant <- subset(filter(significant, pvalue<.05))
+#significant <- subset(filter(significant, baseMean>50))
+write.csv(final_results, paste0("OligoAnalysis/differential_expression_results/diffex_results_(stressed.vs.normal oligos gse180759 - patient controlled).csv"))
+
+
+
+
+
+#Normal vs stressed oligos with tissue split and patient id control
+seurat.obj@meta.data$cell_type<-seurat.obj@meta.data$Condition #celltype is to run tissue split
+metadata2 <- as.data.frame(seurat.obj@meta.data)
+celltypes_list<-unique(metadata2$cell_type)
+
+for(x in 1:length(celltypes_list)){
+  celltype_rownames <- rownames(subset(metadata2, metadata2$cell_type==celltypes_list[x]))
+  if(length(celltype_rownames)>200){
+    celltype_counts <- seurat.obj@assays$RNA@counts[,colnames(seurat.obj@assays$RNA@counts) %in% celltype_rownames]
+    celltype_metadata <- metadata2[rownames(metadata2) %in% celltype_rownames,]
+    sample_ids <- unique(celltype_metadata$sample_id)
+    
+    #split by sample,
+    output_counts <- data.frame()
+    output_metadata <- data.frame()
+    for(y in 1:length(sample_ids)){
+      sample_ids_rownames <- rownames(subset(celltype_metadata, celltype_metadata$sample_id==sample_ids[y]))
+      grouped_celltype_counts <- as.data.frame(celltype_counts[,colnames(celltype_counts) %in% sample_ids_rownames])
+      grouped_celltype_metadata <- celltype_metadata[rownames(celltype_metadata) %in% sample_ids_rownames,]
+      
+      #combine within sample
+      if(sum(grouped_celltype_counts[1])>1){
+        grouped_celltype_counts <- as.data.frame(rowSums(grouped_celltype_counts))
+        colnames(grouped_celltype_counts) <-sample_ids[y]
+        grouped_celltype_metadata <- grouped_celltype_metadata[1,]
+        rownames(grouped_celltype_metadata) <- grouped_celltype_metadata$sample_id
+        if(length(output_counts)==0){
+          output_counts <- grouped_celltype_counts
+        }else{
+          output_counts <- cbind(output_counts,grouped_celltype_counts)
+        }
+        if(length(output_metadata)==0){
+          output_metadata <- grouped_celltype_metadata
+        }else{
+          output_metadata <- rbind(output_metadata,grouped_celltype_metadata)
+        }
+      }
+    }
+    data_counts<-output_counts
+    data_counts <- round(data_counts)
+    metadata<-output_metadata
+    metadata$sample <- rownames(metadata)
+    dds <- DESeqDataSetFromMatrix(countData = data_counts, colData = metadata, design = ~ condition + patient_info)
+    dds <- estimateSizeFactors(dds)
+    keep <- rowSums(dds@colData$condition == 'normal oligodendrocyte' & counts(dds, normalized=TRUE)==0) <= .25*sum(dds@colData$condition == 'normal oligodendrocyte') & rowSums(dds@colData$condition != 'normal oligodendrocyte' & counts(dds, normalized=TRUE)==0) <=.25*sum(dds@colData$condition != 'normal oligodendrocyte')
+    dds <- dds[keep,]
+    dds <- DESeq(dds)
+    result <- results(dds, contrast = c('condition', 'stressed oligodendrocyte', 'normal oligodendrocyte'))
+    final_results <- data.frame(result)
+    final_results$gene_name <- rownames(final_results)
+    final_results$comparison <- "Stressed vs normal"
+    final_results$tissue<-celltypes_list[x]
+    #significant <- subset(filter(final_results, abs(log2FoldChange)>.585))
+    #significant <- subset(filter(significant, pvalue<.05))
+    #significant <- subset(filter(significant, baseMean>50))
+    write.csv(final_results, paste0("OligoAnalysis/differential_expression_results/diffex_results_(stressed.vs.normal oligos gse180759 - patient controlled)", final_results$tissue[1], ".csv"))
+     #write.csv(output_counts, paste0('datasets/', study, "/pseudobulk_counts_matrices/", celltypes_list[x], "_pseudobulk_data.csv"))
+    #write.csv(output_metadata, paste0('datasets/', study, "/pseudobulk_counts_matrices/", celltypes_list[x], "_pseudobulk_metadata.csv"))
+  }
+}
 
 #cuprizone and EAE KLK6
+library(Seurat)
+library(tidyverse)
+library(DESeq2)
 setwd("~/cloud-data/cloud-pipeline-tim-tri-culture-storage/PMCB/SCB/hOligo_MS_data")
 cup<-readRDS("EBPi_snRNAseq_full_seurat.RDS")
-cup <- FindVariableFeatures(object = cup)
-cup <- ScaleData(object = cup)
-cup <- RunPCA(object = cup)
-cup <- RunUMAP(object = cup, dims = 1:15)
-FeaturePlot(object = cup, features = "Klk6")
-DimPlot(cup, reduction = 'umap', group.by = "sargent_cellstates", raster = FALSE)
+# cup <- FindVariableFeatures(object = cup)
+# cup <- ScaleData(object = cup)
+# cup <- RunPCA(object = cup)
+# cup <- RunUMAP(object = cup, dims = 1:15)
+# FeaturePlot(object = cup, features = "Klk6")
+# DimPlot(cup, reduction = 'umap', group.by = "sargent_cellstates", raster = FALSE)
 
 View(cup@meta.data)
 unique(cup@meta.data$disease)
 unique(cup@meta.data$cuprizone)
 unique(cup@meta.data$treatment)
+unique(cup@meta.data$time..wks.)
 sum(is.na(cup@meta.data$cuprizone))
+cup@meta.data$cell_type<-cup@meta.data$sargent_cellstates
+#cup@meta.data$cell_type<-cup@meta.data$signacx_cellstates
+cup@meta.data$sample_id
+cup@meta.data$condition<-"control"
+cup@meta.data$condition[cup@meta.data$cuprizone == "Cuprizone"]<-"MS"
+cup@meta.data$condition[cup@meta.data$treatment == "RA742"]<-"treated"
+unique(cup@meta.data$cell_type)
+unique(cup@meta.data$condition)
+
+metadata2<-cup@meta.data
+seurat.obj<-cup
+
+setwd("~/cloud-data/cloud-pipeline-tim-tri-culture-storage/Drew_Macklin")
+
+celltypes_list<-unique(metadata2$cell_type)
+
+#split by cell type
+for(x in 15:length(celltypes_list)){
+  celltype_rownames <- rownames(subset(metadata2, metadata2$cell_type==celltypes_list[x]))
+  if(length(celltype_rownames)>200){
+    celltype_counts <- seurat.obj@assays$RNA@counts[,colnames(seurat.obj@assays$RNA@counts) %in% celltype_rownames]
+    celltype_metadata <- metadata2[rownames(metadata2) %in% celltype_rownames,]
+    sample_ids <- unique(celltype_metadata$sample_id)
+    
+    #split by sample,
+    output_counts <- data.frame()
+    output_metadata <- data.frame()
+    for(y in 1:length(sample_ids)){
+      sample_ids_rownames <- rownames(subset(celltype_metadata, celltype_metadata$sample_id==sample_ids[y]))
+      grouped_celltype_counts <- as.data.frame(celltype_counts[,colnames(celltype_counts) %in% sample_ids_rownames])
+      grouped_celltype_metadata <- celltype_metadata[rownames(celltype_metadata) %in% sample_ids_rownames,]
+      
+      #combine within sample
+      if(sum(grouped_celltype_counts[1])>1){
+        grouped_celltype_counts <- as.data.frame(rowSums(grouped_celltype_counts))
+        colnames(grouped_celltype_counts) <-sample_ids[y]
+        grouped_celltype_metadata <- grouped_celltype_metadata[1,]
+        rownames(grouped_celltype_metadata) <- grouped_celltype_metadata$sample_id
+        if(length(output_counts)==0){
+          output_counts <- grouped_celltype_counts
+        }else{
+          output_counts <- cbind(output_counts,grouped_celltype_counts)
+        }
+        if(length(output_metadata)==0){
+          output_metadata <- grouped_celltype_metadata
+        }else{
+          output_metadata <- rbind(output_metadata,grouped_celltype_metadata)
+        }
+      }
+    }
+    write.csv(output_counts, paste0("OligoAnalysis/Cuprizone/pseudobulk_counts_matrices/", celltypes_list[x], "_pseudobulk_data.csv"))
+    write.csv(output_metadata, paste0("OligoAnalysis/Cuprizone/pseudobulk_counts_matrices/", celltypes_list[x], "_pseudobulk_metadata.csv"))
+    data_counts<-output_counts
+    data_counts <- round(data_counts)
+    metadata<-output_metadata
+    metadata$sample <- rownames(metadata)
+    dds <- DESeqDataSetFromMatrix(countData = data_counts, colData = metadata, design = ~ condition)
+    dds <- estimateSizeFactors(dds)
+    keep <- rowSums(dds@colData$condition == 'control' & counts(dds, normalized=TRUE)==0) <= .25*sum(dds@colData$condition == 'control') & rowSums(dds@colData$condition != 'control' & counts(dds, normalized=TRUE)==0) <=.25*sum(dds@colData$condition != 'control')
+    dds <- dds[keep,]
+    dds <- DESeq(dds)
+    result <- results(dds, contrast = c('condition', 'MS', 'control'))
+    final_results <- data.frame(result)
+    final_results$gene_name <- rownames(final_results)
+    final_results$comparison <- "Cuprizone vs control"
+    final_results$cell_type<-celltypes_list[x]
+    write.csv(final_results, paste0("OligoAnalysis/differential_expression_results/diffex_results_Cuprizone vs Control", final_results$cell_type[1], ".csv"))
+  }
+}
+
+
+####################################################ALL CELLS#############################################################################
+sample_ids <- unique(metadata2$sample_id)
+
+#split by sample
+output_counts <- data.frame()
+output_metadata <- data.frame()
+for(y in 1:length(sample_ids)){
+  sample_ids_rownames <- rownames(subset(metadata2, metadata2$sample_id==sample_ids[y]))
+  grouped_sample_counts <- as.matrix(seurat.obj$RNA@counts[,colnames(seurat.obj$RNA@counts) %in% sample_ids_rownames])
+  grouped_sample_metadata <- metadata2[rownames(metadata2) %in% sample_ids_rownames,]
+  
+  #combine within sample
+  grouped_sample_counts <- as.data.frame(rowSums(grouped_sample_counts))
+  colnames(grouped_sample_counts) <-sample_ids[y]
+  grouped_sample_metadata <- grouped_sample_metadata[1,]
+  rownames(grouped_sample_metadata) <- grouped_sample_metadata$sample_id
+  if(length(output_counts)==0){
+    output_counts <- grouped_sample_counts
+  }else{
+    output_counts <- cbind(output_counts,grouped_sample_counts)
+  }
+  if(length(output_metadata)==0){
+    output_metadata <- grouped_sample_metadata
+  }else{
+    output_metadata <- rbind(output_metadata,grouped_sample_metadata)
+  }
+}
+write.csv(output_counts, paste0("OligoAnalysis/Cuprizone/pseudobulk_counts_matrices/All_Cells_pseudobulk_data.csv"))
+write.csv(output_metadata, paste0("OligoAnalysis/Cuprizone/pseudobulk_counts_matrices/All_Cells_pseudobulk_metadata.csv"))
+data_counts<-output_counts
+data_counts <- round(data_counts)
+metadata<-output_metadata
+metadata$sample <- rownames(metadata)
+dds <- DESeqDataSetFromMatrix(countData = data_counts, colData = metadata, design = ~ condition)
+dds <- estimateSizeFactors(dds)
+keep <- rowSums(dds@colData$condition == 'control' & counts(dds, normalized=TRUE)==0) <= .25*sum(dds@colData$condition == 'control') & rowSums(dds@colData$condition != 'control' & counts(dds, normalized=TRUE)==0) <=.25*sum(dds@colData$condition != 'control')
+dds <- dds[keep,]
+dds <- DESeq(dds)
+result <- results(dds, contrast = c('condition', 'MS', 'control'))
+final_results <- data.frame(result)
+final_results$gene_name <- rownames(final_results)
+final_results$comparison <- "Cuprizone vs control"
+final_results$cell_type<-celltypes_list[x]
+write.csv(final_results, paste0("OligoAnalysis/differential_expression_results/diffex_results_Cuprizone vs Control All_Cells.csv"))
+counts <- as.data.frame(counts(dds, normalized = TRUE))
+counts$gene_name <- rownames(counts)
+write.csv(counts, paste0("OligoAnalysis/Cuprizone/pseudobulk_counts_matrices/All_Cells_Normalized pseudobulk_data.csv"))
+
+library(ggprism)
+
+df_counts <- gather(as.data.frame(counts), key = 'sample', value = 'counts', -gene_name)
+df_counts <- left_join(df_counts, select(metadata, sample, condition), by = 'sample')
+
+#create barplot for EVERY gene and celltype and indication in datasets
+all_genes <- "Klk6"
+celltype<- "All_cells"
+
+for(x in 1:length(all_genes)){
+  df_counts_plot <- filter(df_counts, gene_name == all_genes[x])
+  df_counts_plot_summary <- df_counts_plot %>%
+    group_by(condition) %>%
+    summarise(mean = mean(counts),
+              sd = sd(counts))
+  diseases <- as.character(unique(metadata[metadata$condition!='control', 'condition']))
+  df_counts_plot_summary <- df_counts_plot_summary %>% mutate(condition = fct_relevel(condition, "control", diseases))
+  bar_plot <- ggplot(df_counts_plot_summary, aes(x = condition, y = mean, fill = condition, colour = condition)) +
+    geom_bar(stat = 'identity', width = 0.5, alpha = .5) +
+    geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd), width = 0.1) +
+    geom_jitter(data = df_counts_plot, aes(x = condition, y = counts, shape = condition), size = 1, width = 0.25) +
+    theme_prism(base_size=10) +
+    scale_fill_prism(palette='shades_of_gray')+
+    scale_colour_prism(palette='shades_of_gray')+
+    scale_shape_prism(palette='filled')+
+    theme(text = element_text(size = 10),
+          axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+          axis.title.x = element_blank(),
+          legend.position = 'none',
+          plot.title = element_text(size = 10)) +
+    ggtitle(paste(celltype, all_genes[x])) +
+    ylab('normalized counts')
+}
+
+klk6_cup<-list.files("OligoAnalysis/differential_expression_results/")[grepl("uprizone", list.files("OligoAnalysis/differential_expression_results/"))]
+find_klk6p<-function(x){
+  b<-read.csv(paste0("OligoAnalysis/differential_expression_results/",x))
+  print(b$padj[b$X=="Klk6"])
+  print(x)
+}
+for(a in 1:length(klk6_cup)){
+  find_klk6p(klk6_cup[a])
+}
+
 
 EAE <- readRDS("~/cloud-data/cloud-pipeline-tim-tri-culture-storage/Drew_Macklin/mouse_datasets/EAE_Internal_Hammond/seurat_object/CSF1r inhibitor mouse EAE.rds")
 EAE <- FindVariableFeatures(object = EAE)
