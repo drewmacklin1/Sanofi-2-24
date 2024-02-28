@@ -79,7 +79,7 @@ for(a in c(22, 27, 28, 29)){
       }
     }
     "
-    base_url <- "https://opentargets.sanofi.com/api/v4/graphql" #GiTIPs is on the private Sanofi server
+    base_url <- "https://opentargets.sanofi.com/api/v4/graphql" #GiTIPs is on the private Sanofi server (genetics informed target indication pairs)
     variables <- list("ensemblId" = gene_id)
     post_body <- list(query = query_string, variables = variables)
     httr::set_config(config(ssl_verifypeer = 0))                    #required to get around Sanofi Proxy
