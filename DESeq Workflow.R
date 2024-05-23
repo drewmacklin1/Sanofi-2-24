@@ -1,3 +1,7 @@
+#this code outputs l2fc, pvalue, padj csvs for every dataset for every celltype comparing disease vs control
+#this code generates a barplot for every gene for every celltype for every dataset
+#this code generates a heatmap and summary file for the l2fc and padj for "program" (short gene lists that are important to a certain program)
+
 setwd("~/cloud-data/cloud-pipeline-tim-tri-culture-storage/Drew_Macklin")
 
 library(DESeq2)
@@ -19,10 +23,10 @@ for(s in 1:length(studylist)){
     dir.create(paste0("results_target_credentialing_121223/", program1, "/", study))
   }
 
-  #for every cell type in pseudobulk folder (excluding the all_cells)
-  #odds <- function(x) x[ x %% 2 == 1 ]
-  #modifier <- odds(1:length(files))
-  for (j in c(1)){#} modifier){
+  #for every cell type in pseudobulk folder 
+  odds <- function(x) x[ x %% 2 == 1 ]
+  modifier <- odds(1:length(files))
+  for (j in modifier){
     data_counts<-as.data.frame(read.csv(paste0('datasets/', study, '/pseudobulk_counts_matrices/', files[j])))
     rownames(data_counts)<-data_counts$X
     data_counts<-data_counts[-1]
@@ -58,7 +62,7 @@ for(s in 1:length(studylist)){
         #Export results as csv to folder
         write.csv(final_results, paste0("datasets/", study, "/differential_expression_results/diffex_results_", final_results$celltype[1], final_results$comparison[1], ".csv"))
         
-        #Heat Maps
+        #Heat Maps and summary file
         paletteLength <- 50
         myColor <- colorRampPalette(c("blue", "white", "red"))(paletteLength)
         for (x in 1:length(program_list)){
@@ -116,7 +120,7 @@ for(s in 1:length(studylist)){
           summary_info <- subset(filter(final_results, gene_name %in% program_gene_list), select = c('log2FoldChange','padj', 'pvalue', 'celltype', 'comparison', 'dataset.origin'))
           if(!is.na(summary_info[1,1])){
             summary_info$program<-program1
-            #write.csv(summary_info, paste0("results_target_credentialing_121223/", program1, "/", study, "/", final_results$celltype[1], "/", final_results$comparison[1], "_summary.csv"))
+            write.csv(summary_info, paste0("results_target_credentialing_121223/", program1, "/", study, "/", final_results$celltype[1], "/", final_results$comparison[1], "_summary.csv"))
           }
         }
       }
