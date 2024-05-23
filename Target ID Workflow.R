@@ -1,3 +1,8 @@
+#this code generates a CSV that has a row for the top 500 celltype-gene-disease combinations likely to result in a successful target for a drug candidate. 
+#the csv has many columns. A few notable columns are: the Parkinson's disease over all score, ALS overall score, and the AD overall score
+#The scores are given by the L2FC (filtered for only padj<.05 in 2/3 of the studies for the given celltype-disease combination), GWAS score, safety score, druggability score, 
+#drug approval score, testability score, and other metrics 
+
 library(biomaRt)
 library(tidyverse)
 library(httr)
@@ -213,7 +218,7 @@ for(a in 1:length(rownames(csv2))){
   #factor in triculture expression
   #if(csv2[a,"Micro BaseMean"]>40){   #change for each celltype
       csv2$Target_PD[a]<-abs(csv2$PD[a])*as.numeric(csv2[a, "`ALS ALS Total Score`"])*csv2$DruggabilityScore[a]
-      csv2$Target_AD[a]<-abs(csv2$AD[a])*as.numeric(csv2[a, "`ALS ALS Total Score`"])*csv2$DruggabilityScore[a]
+      csv2$Target_AD[a]<-abs(csv2$AD[a])*as.numeric(csv2[a, "`ALS ALS Total Score`"])*csv2$DruggabilityScore[a] #als is the only completed program hence we are not using the AD AD Total Score score
       csv2$Target_ALS[a]<-abs(csv2$ALS[a])*as.numeric(csv2[a, "`ALS ALS Total Score`"])*csv2$DruggabilityScore[a]
  #   }
   
