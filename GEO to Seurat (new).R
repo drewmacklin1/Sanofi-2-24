@@ -13,6 +13,7 @@ setwd("~/cloud-data/cloud-pipeline-tim-tri-culture-storage/Drew_Macklin")
 library(tidyverse)
 library(Seurat)
 
+#Edit file names and structure to be compatible with the Read10X() function
 sample_names<- list.files("DMD_datasets/temp", pattern = "*matrix.mtx.gz")
 sample_names<- str_replace(sample_names, "(GSM[0-9]+_.+)_matrix.mtx.gz", "\\1")
 for (x in 1:length(sample_names)){
@@ -49,6 +50,7 @@ for(x in 1:length(sample_names)){
   }
 }
 
+#Convert the folders into Seurat objects for each sample
 files<-list.files("DMD_datasets/temp")
 print(length(files))
 GSM6596509_wtNSG01<-Read10X(paste0("DMD_datasets/temp/", files[1]))
@@ -65,8 +67,10 @@ GSM6596512_mdxNSG02<-CreateSeuratObject(counts = GSM6596512_mdxNSG02, project = 
 GSM6596513_mdxD2NSG01<-CreateSeuratObject(counts = GSM6596513_mdxD2NSG01, project = "GSM6596513_mdxD2NSG01", min.cells = 3, min.features = 200)
 GSM6596514_mdxD2NSG02<-CreateSeuratObject(counts = GSM6596514_mdxD2NSG02, project = "GSM6596514_mdxD2NSG02", min.cells = 3, min.features = 200)
 
+#Merge all the samples into one Seurat object
 merged<-merge(GSM6596509_wtNSG01, c(GSM6596510_wtNSG02,GSM6596511_mdxNSG01,GSM6596512_mdxNSG02,GSM6596513_mdxD2NSG01,GSM6596514_mdxD2NSG02))
 
+#Filter the Seurat Object
 merged[["percent.mt"]] <- PercentageFeatureSet(merged, pattern = "^MT-")
 merged_seurat_filtered <- subset(merged, subset = nCount_RNA > 800 & nFeature_RNA > 500 & percent.mt < 5)
 rm(list=setdiff(ls(), "merged_seurat_filtered"))
@@ -79,9 +83,11 @@ merged_seurat_filtered <- FindNeighbors(object = merged_seurat_filtered, dims = 
 merged_seurat_filtered <- FindClusters(object = merged_seurat_filtered, resolution = 0.1)
 merged_seurat_filtered <- RunUMAP(object = merged_seurat_filtered, dims = 1:15)
 
+#Ensure that no batch correction is necessary
 p1 <- DimPlot(merged_seurat_filtered, reduction = 'umap', group.by = "orig.ident", raster = FALSE)
 p1
 
+#Annotate metadata with information from GEO
 merged_seurat_filtered@meta.data$condition[merged_seurat_filtered@meta.data$orig.ident %in% c("GSM6596509_wtNSG01", "GSM6596510_wtNSG02")]<-"control"
 merged_seurat_filtered@meta.data$condition[merged_seurat_filtered@meta.data$orig.ident %in% c("GSM6596511_mdxNSG01", "GSM6596512_mdxNSG02")]<-"dystrophic"
 merged_seurat_filtered@meta.data$condition[merged_seurat_filtered@meta.data$orig.ident %in% c("GSM6596513_mdxD2NSG01", "GSM6596514_mdxD2NSG02")]<-"severely dystrophic"
@@ -93,6 +99,7 @@ merged_seurat_filtered@meta.data$tissue<-"Right Hindlimb Gastrocnemius"
 merged_seurat_filtered@meta.data$treatment<-"not treated"
 View(merged_seurat_filtered@meta.data)
 
+#Save merged and annotated Seurat Object
 saveRDS(merged_seurat_filtered, file = "DMD_datasets/temp/seurat.rds")
 
 #upload to BioTuring for celltype ID if no batch correction needed
