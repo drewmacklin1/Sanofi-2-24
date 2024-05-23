@@ -11,13 +11,14 @@ seurat.obj <- readRDS(paste0('datasets/', study, "/seurat_object/", seurat.obj_n
 metadata2 <- as.data.frame(seurat.obj@meta.data)
 View(metadata2)
 
-metadata2$cell_type <- seurat.obj@meta.data$
-  metadata2$sample_id <- seurat.obj@meta.data$
-  metadata2$gender <- seurat.obj@meta.data$
-  metadata2$condition <- seurat.obj@meta.data$
-  metadata2$cell_type[metadata2$cell_type == ''] <- ""
-metadata2$condition[metadata2$condition == ''] <- "control"
+metadata2$cell_type <- seurat.obj@meta.data$ #using the metadata specify what column contains the cell type data
+metadata2$sample_id <- seurat.obj@meta.data$ #using the metadata specify what column contains the sample ID data
+metadata2$gender <- seurat.obj@meta.data$ #using the metadata specify what column contains the gender data
+metadata2$condition <- seurat.obj@meta.data$ #using the metadata specify what column contains the condition data
+metadata2$cell_type[metadata2$cell_type == ''] <- "" #using the metadata convert any celltypes that may throw errors eg. macro/mono
+metadata2$condition[metadata2$condition == ''] <- "control" #using the metadata specify that is control ie not "Normal" or "normal" or "healthy" or "Healthy" or "Control"
 
+#verify the cell types, condition, gender, and sample ID are expected
 print(unique(metadata2$cell_type))
 print(unique(metadata2$condition))
 print(unique(metadata2$gender))
@@ -65,7 +66,7 @@ for(x in 1:length(celltypes_list)){
 }
 
 
-####################################################ALL CELLS#############################################################################
+####################################################ALL CELLS############################################################################# (This is the equivalent of bulking all the data)
 sample_ids <- unique(metadata2$sample_id)
 
 #split by sample
